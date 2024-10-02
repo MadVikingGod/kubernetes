@@ -23,11 +23,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -290,6 +290,99 @@ func TestGetPodContainerName(t *testing.T) {
 			actualCgroupName, actualLiteralCgroupfs := pcm.GetPodContainerName(tt.args.pod)
 			require.Equalf(t, tt.wantCgroupName, actualCgroupName, "Unexpected cgroup name for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 			require.Equalf(t, tt.wantLiteralCgroupfs, actualLiteralCgroupfs, "Unexpected literal cgroupfs for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
+		})
+	}
+}
+
+func Test_podContainerManagerImpl_EnsureExists(t *testing.T) {
+	newGuaranteedPodWithUID := func(uid types.UID) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: uid,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "container",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("1000m"),
+								v1.ResourceMemory: resource.MustParse("1G"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("1000m"),
+								v1.ResourceMemory: resource.MustParse("1G"),
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	type fields struct {
+		// qosContainersInfo QOSContainersInfo
+		// subsystems        *CgroupSubsystems
+		cgroupManager CgroupManager
+		// podPidsLimit      int64
+		// enforceCPULimits  bool
+		// cpuCFSQuotaPeriod uint64
+	}
+	type args struct {
+		pod *v1.Pod
+	}
+	tests := []struct {
+		name            string
+		fields          fields
+		args            args
+		wantErr         bool
+		wantCgroupCalls []string
+	}{
+		{
+			name: "cgroup exists",
+			fields: fields{
+				cgroupManager: &FakeCgroupManager{exists: true},
+			},
+			args:            args{pod: newGuaranteedPodWithUID("fake-uid-1")},
+			wantErr:         false,
+			wantCgroupCalls: []string{"Exists"},
+		},
+		{
+			name: "cgroup created",
+			fields: fields{
+				cgroupManager: &FakeCgroupManager{exists: false},
+			},
+			args:            args{pod: newGuaranteedPodWithUID("fake-uid-1")},
+			wantErr:         false,
+			wantCgroupCalls: []string{"Create"},
+		},
+		{
+			name: "failed to create cgroup",
+			fields: fields{
+				cgroupManager: &FakeCgroupManager{exists: false, create: assert.AnError},
+			},
+			args:            args{pod: newGuaranteedPodWithUID("fake-uid-1")},
+			wantErr:         true,
+			wantCgroupCalls: []string{"Create"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &podContainerManagerImpl{
+				// qosContainersInfo: tt.fields.qosContainersInfo,
+				// subsystems:        tt.fields.subsystems,
+				cgroupManager: tt.fields.cgroupManager,
+				// podPidsLimit:      tt.fields.podPidsLimit,
+				// enforceCPULimits:  tt.fields.enforceCPULimits,
+				// cpuCFSQuotaPeriod: tt.fields.cpuCFSQuotaPeriod,
+			}
+			if err := m.EnsureExists(tt.args.pod); (err != nil) != tt.wantErr {
+				t.Errorf("podContainerManagerImpl.EnsureExists() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			for _, call := range tt.wantCgroupCalls {
+				require.Contains(t, tt.fields.cgroupManager.(*FakeCgroupManager).CalledFunctions, call)
+			}
 		})
 	}
 }
