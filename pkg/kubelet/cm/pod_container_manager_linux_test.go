@@ -20,10 +20,10 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -321,12 +321,7 @@ func Test_podContainerManagerImpl_EnsureExists(t *testing.T) {
 	}
 
 	type fields struct {
-		// qosContainersInfo QOSContainersInfo
-		// subsystems        *CgroupSubsystems
 		cgroupManager CgroupManager
-		// podPidsLimit      int64
-		// enforceCPULimits  bool
-		// cpuCFSQuotaPeriod uint64
 	}
 	type args struct {
 		pod *v1.Pod
@@ -359,7 +354,7 @@ func Test_podContainerManagerImpl_EnsureExists(t *testing.T) {
 		{
 			name: "failed to create cgroup",
 			fields: fields{
-				cgroupManager: &FakeCgroupManager{exists: false, create: assert.AnError},
+				cgroupManager: &FakeCgroupManager{exists: false, create: errors.New("test - failed to create cgroup")},
 			},
 			args:            args{pod: newGuaranteedPodWithUID("fake-uid-1")},
 			wantErr:         true,
@@ -369,12 +364,7 @@ func Test_podContainerManagerImpl_EnsureExists(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &podContainerManagerImpl{
-				// qosContainersInfo: tt.fields.qosContainersInfo,
-				// subsystems:        tt.fields.subsystems,
 				cgroupManager: tt.fields.cgroupManager,
-				// podPidsLimit:      tt.fields.podPidsLimit,
-				// enforceCPULimits:  tt.fields.enforceCPULimits,
-				// cpuCFSQuotaPeriod: tt.fields.cpuCFSQuotaPeriod,
 			}
 			if err := m.EnsureExists(tt.args.pod); (err != nil) != tt.wantErr {
 				t.Errorf("podContainerManagerImpl.EnsureExists() error = %v, wantErr %v", err, tt.wantErr)
