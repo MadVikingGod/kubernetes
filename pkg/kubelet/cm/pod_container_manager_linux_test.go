@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -366,9 +367,8 @@ func Test_podContainerManagerImpl_EnsureExists(t *testing.T) {
 			m := &podContainerManagerImpl{
 				cgroupManager: tt.fields.cgroupManager,
 			}
-			if err := m.EnsureExists(tt.args.pod); (err != nil) != tt.wantErr {
-				t.Errorf("podContainerManagerImpl.EnsureExists() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			err := m.EnsureExists(tt.args.pod)
+			assert.Equalf(t, tt.wantErr, err != nil, "podContainerManagerImpl.EnsureExists() error = %v, wantErr %v", err, tt.wantErr)
 
 			for _, call := range tt.wantCgroupCalls {
 				require.Contains(t, tt.fields.cgroupManager.(*FakeCgroupManager).CalledFunctions, call)
