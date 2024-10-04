@@ -328,20 +328,22 @@ func Test_podContainerManagerImpl_EnsureExists(t *testing.T) {
 		pod *v1.Pod
 	}
 	tests := []struct {
-		name            string
-		fields          fields
-		args            args
-		wantErr         bool
-		wantCgroupCalls []string
+		name               string
+		fields             fields
+		args               args
+		wantErr            bool
+		wantCgroupCalls    []string
+		excludeCgroupCalls []string
 	}{
 		{
 			name: "cgroup exists",
 			fields: fields{
 				cgroupManager: &FakeCgroupManager{exists: true},
 			},
-			args:            args{pod: newGuaranteedPodWithUID("fake-uid-1")},
-			wantErr:         false,
-			wantCgroupCalls: []string{"Exists"},
+			args:               args{pod: newGuaranteedPodWithUID("fake-uid-1")},
+			wantErr:            false,
+			wantCgroupCalls:    []string{"Exists"},
+			excludeCgroupCalls: []string{"Create"},
 		},
 		{
 			name: "cgroup created",
@@ -350,7 +352,7 @@ func Test_podContainerManagerImpl_EnsureExists(t *testing.T) {
 			},
 			args:            args{pod: newGuaranteedPodWithUID("fake-uid-1")},
 			wantErr:         false,
-			wantCgroupCalls: []string{"Create"},
+			wantCgroupCalls: []string{"Exists", "Create"},
 		},
 		{
 			name: "failed to create cgroup",
@@ -359,7 +361,7 @@ func Test_podContainerManagerImpl_EnsureExists(t *testing.T) {
 			},
 			args:            args{pod: newGuaranteedPodWithUID("fake-uid-1")},
 			wantErr:         true,
-			wantCgroupCalls: []string{"Create"},
+			wantCgroupCalls: []string{"Exists", "Create"},
 		},
 	}
 	for _, tt := range tests {
@@ -372,6 +374,9 @@ func Test_podContainerManagerImpl_EnsureExists(t *testing.T) {
 
 			for _, call := range tt.wantCgroupCalls {
 				require.Contains(t, tt.fields.cgroupManager.(*FakeCgroupManager).CalledFunctions, call)
+			}
+			for _, call := range tt.excludeCgroupCalls {
+				require.NotContains(t, tt.fields.cgroupManager.(*FakeCgroupManager).CalledFunctions, call)
 			}
 		})
 	}
