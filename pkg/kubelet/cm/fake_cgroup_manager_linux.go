@@ -29,6 +29,7 @@ type FakeCgroupManager struct {
 	// Return values
 	create error
 	exists bool
+	update error
 }
 
 func (cgm *FakeCgroupManager) Create(_ *CgroupConfig) error {
@@ -51,7 +52,7 @@ func (cgm *FakeCgroupManager) Update(_ *CgroupConfig) error {
 	cgm.Lock()
 	defer cgm.Unlock()
 	cgm.CalledFunctions = append(cgm.CalledFunctions, "Update")
-	return nil
+	return cgm.update
 }
 
 // Validate checks if the cgroup is valid
